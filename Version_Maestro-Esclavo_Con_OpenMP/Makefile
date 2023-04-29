@@ -9,4 +9,3 @@ slave: Slave.cpp
 run: master_exec slave_exec
 	@./mulExec.sh
 
-
