@@ -1,9 +1,8 @@
-#include <iostream>
-#include <cmath>
-#include <cstdio>
-#include <stdlib.h>
-#include <string.h>
 #include <mpi.h>
+#include <cstdio>
+
+#define TAG_ASK 1
+#define TAG_STOP 0
 
 /////////////////////////////// CASO 1 ///////////////////////////////////////////////////////////////////////////////////////////////
 #define nLines 9			//N�mero de filas de los textos cifrados
@@ -131,8 +130,7 @@ int ciphered[nLines][nCharsPerLine] = { //[9][33] - 2 rotores
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-void printNumbersAsString(int lines[nLines][nCharsPerLine])
-{
+void printNumbersAsString(int lines[nLines][nCharsPerLine]){
 	for (int idx = 0; idx < nLines; idx++)
 	{
 		char line[nCharsPerLine + 1];
@@ -145,109 +143,76 @@ void printNumbersAsString(int lines[nLines][nCharsPerLine])
 	}
 }
 
+int main(int argc, char ** argv){
 
-
-void enigma()
-{
+	//Imprimimos la información cifrada:
 	printf("ESTO ES LA ENTRADA: \n");
 	printNumbersAsString(ciphered);
 	printf("\n");
 	printf("\n");
 
-	printf("DESCIFRANDO...: \n");
+
+	int pid, np; //PID , number of processes
+	MPI_Init(&argc,&argv);
+	MPI_Comm_rank(MPI_COMM_WORLD, &pid);
+	MPI_Comm_size(MPI_COMM_WORLD, &np);
+	MPI_Status status;
 	int deciphered[nLines][nCharsPerLine];
-	for (int idx = 0; idx < nLines; idx++)
+
+	//Ejecución maestro:
+	if(pid==0)
 	{
-		for (int lineKey = (int)pow(10, nRotors - 1); lineKey < (int)pow(10, nRotors); lineKey++)
-		{
-			int* p_deciphered = (int*)malloc(sizeof(int) * nCharsPerLine);
-			p_deciphered = decipher(p_deciphered, ciphered[idx], lineKey);
+		printf("Maestro: inciado ejecutando envio de argumentos...\n");
+		int tareasEnviadas=0,tareasRecividas=0;
+		
+		//Envio de argumentos:
+		int args[2];
+		args[0]=nCharsPerLine;
+		args[1]=nRotors;
+		for(int i=1;i<np;i++) MPI_Send(&args,2,MPI_INT,i,TAG_ASK,NULL);
+		printf("Maestro: envio de argumentos completado...\n");
 
-			char decipheredLine[nCharsPerLine];
-			for (int idx = 0; idx < nCharsPerLine; idx++)
-			{
-				decipheredLine[idx] = p_deciphered[idx];
+		//Ejecución maestra:
+
+		//Repartimos tantas tareas como nodos haya:
+		printf("Maestro: enviando primer ciclo de tareas...\n");
+		for(int i=1;i<np;i++) {
+            if(tareasEnviadas<nLines){
+				printf("Maestro: enviando tarea %d...\n",tareasEnviadas);
+				MPI_Send(&ciphered[tareasEnviadas],nCharsPerLine,MPI_INT,i,TAG_ASK,MPI_COMM_WORLD);
+				MPI_Send(&tareasEnviadas,1,MPI_INT,i,TAG_ASK,MPI_COMM_WORLD);
+				tareasEnviadas++;
 			}
-			free(p_deciphered);
+        }
 
-			char stringKey[nRotors + 1];
-			sprintf(stringKey, "%d", lineKey);
-			if (!strncmp(stringKey, decipheredLine, nRotors))
-			{
-				for (int idx2 = 0; idx2 < nCharsPerLine; idx2++)
-				{
-					deciphered[idx][idx2] = decipheredLine[idx2];
-				}
-				printf("Descifrada linea %d con clave %d\n", idx, lineKey);
-				break;
+		//Seguimos enviando y recibiendo tareas si falta recivirlas o enviarlas
+		int cipheredLine[nCharsPerLine];
+		int index;
+		while(tareasRecividas<nLines){
+			MPI_Recv(&cipheredLine,nCharsPerLine,MPI_INT,MPI_ANY_SOURCE,TAG_ASK,MPI_COMM_WORLD,&status);
+			MPI_Recv(&index,1,MPI_INT,status.MPI_SOURCE,TAG_ASK,MPI_COMM_WORLD,&status);
+			tareasRecividas++;
+			for(int i=0;i<nCharsPerLine;i++) deciphered[index][i]=cipheredLine[i];
+			if(tareasEnviadas<nLines){
+				MPI_Send(&ciphered[tareasEnviadas],nCharsPerLine,MPI_INT,status.MPI_SOURCE,TAG_ASK,MPI_COMM_WORLD);
+				MPI_Send(&tareasEnviadas,1,MPI_INT,status.MPI_SOURCE,TAG_ASK,MPI_COMM_WORLD);
+				tareasEnviadas++;
 			}
 		}
-	}
 
+		//Mandamos una señal para que los esclavos terminen de trabajar:
+		for(int i=1;i<np;i++) {
+            MPI_Send(0,0,MPI_INT,i,TAG_STOP,MPI_COMM_WORLD);
+        }
+	}
+	
+	MPI_Finalize();
+
+	//Imprimimos la información ya descifrada:
 	printf("\n");
 	printf("ESTO ES LA SALIDA:\n");
 	printNumbersAsString(deciphered);
 	printf("\n");
 	printf("\n");
-}
 
-int main(int argc, char* argv[])
-{
-
-	enigma();
-
-	return 0;
-}
-
-int main(int argc, char ** argv)
-{
-	int pid, np; //PID , number of processes
-	MPI_Init();
-	MPI_Comm_rank(MPI_COMM_WORLD, &pid);
-	MPI_Comm_size(MPI_COMM_WORLD, &np);
-
-	//Ejecución maestro:
-	if(pid==0)
-	{
-		int i;
-		int tareasDisponibles = nLines-1;
-		int linesDesciphered[nLines][nCharsPerLine];
-		MPI_Request * estadoNodos = (MPI_Request *)malloc(sizeof(MPI_Request)*np);
-
-		//Envio de argumentos:
-		int args[2];
-		args[0]=nCharsPerLine;
-		args[1]=nRotors;
-		for(int i=1;i<np;i++) MPI_Send(&args,2,MPI_INT,i,0,NULL);
-
-		
-
-		for(i = 1; i < np; i++)
-		{
-			int line=tareaDisponibles;
-			if(line<0)break;
-			MPI_Send(&line, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
-			MPI_Send(ciphered[line],nCharsPerLine,MPI_CHAR,i,0,MPI_COMM_WORLD);
-			if(taresDisponibles!=0)tareasDisponibles--;
-			MPI_Irecv(linesDesciphered[line],nCharsPerLine,MPI_CHAR,i,0,MPI_COMM_WORLD,&estadoNodos[i]);
-		}
-		while(1)
-		{
-			for(i = 1; i < np; i++)
-			{
-				if(MPI_Request_get_status(estadoNodos[i], 0, MPI_STATUS_IGNORE))
-				{
-					if(coordsDisp < 1)
-						hayTrabajo=0;
-					MPI_Send(&hayTrabajo, 1, MPI_INT, i, 1, MPI_COMM_WORLD);
-					if(hayTrabajo)
-					{
-						MPI_Send(/*coords*/, /*N datos*/, /*tipo dato*/, i, 0, MPI_COMM_WORLD);
-						coordsDisp--;
-						MPI_Irecv(/*ruta*/, /*N datos*/, /*tipo dato*/, i, 0, MPI_COMM_WORLD, &estadoNodos[i]);
-					}
-				}
-			}
-		}
-	}
 }
