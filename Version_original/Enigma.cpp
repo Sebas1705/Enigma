@@ -142,9 +142,7 @@ void printNumbersAsString(int lines[nLines][nCharsPerLine])
 			line[idx2] = lines[idx][idx2];
 		}
 		line[nCharsPerLine] = '\0';
-		#ifdef PRINTS
 		printf("%s\n", line);
-		#endif
 	}
 }
 

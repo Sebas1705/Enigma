@@ -3,7 +3,7 @@
 #include <omp.h>
 #include <fstream>
 
-//#define PRINTS true
+//#define PRINTS
 #define TAG_ASK 1
 #define TAG_STOP 0
 
