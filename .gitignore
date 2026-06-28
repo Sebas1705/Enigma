@@ -1,0 +1,8 @@
+# Compiled executables
+*_exec
+*.out
+*.o
+*.exe
+
+# Build artifacts
+build/
