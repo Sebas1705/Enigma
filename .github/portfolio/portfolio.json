@@ -1,0 +1,11 @@
+{
+  "accent": "#6D28D9",
+  "icon_alt": {
+    "en": "Enigma HPC icon: the letters EN in white on a violet rounded square",
+    "es": "Icono de Enigma HPC: las letras EN en blanco sobre un cuadrado redondeado violeta"
+  },
+  "banner_alt": {
+    "en": "Enigma HPC banner: the monogram icon, the tagline \"Parallel Enigma decryption with MPI and OpenMP\" and the stack (C++, MPI, OpenMP, HPC)",
+    "es": "Banner de Enigma HPC: el icono con monograma, el lema \"Descifrado paralelo de Enigma con MPI y OpenMP\" y el stack (C++, MPI, OpenMP, HPC)"
+  }
+}
